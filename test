@@ -1,0 +1,3 @@
+#!/bin/sh
+
+./emerge_mint_file /bin/true
