@@ -1,4 +1,5 @@
 #!/bin/bash
+# PUBLIC DOMAIN https://github.com/jakeogh/emerge-mint-file
 
 argcount=1
 usage="file"
