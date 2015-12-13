@@ -1,12 +1,22 @@
 #!/bin/bash
 # PUBLIC DOMAIN https://github.com/jakeogh/emerge-mint-file
 
-argcount=1
-usage="file"
-test "$#" -eq "${argcount}" || { echo "$0 ${usage}" > /dev/stderr && exit 1 ; } #"-ge=>=" "-gt=>" "-le=<=" "-lt=<" "-ne=!="
+argcount=2
+usage="file [--nofollow]"
+test "$#" -le "${argcount}" || { echo "$0 ${usage}" > /dev/stderr && exit 1 ; } #"-ge=>=" "-gt=>" "-le=<=" "-lt=<" "-ne=!="
 
-file=`readlink -f "${1}"`
+orig_file="${1}"
 shift
+nofollow="${1-off}"
+shift
+#echo "${nofollow}"
+if [ "${nofollow}" == "--nofollow" ]
+then
+    file="${orig_file}"
+else
+    file=`readlink -f "${orig_file}"`
+fi
+
 test -e "${file}" || { echo "File ${file} not found" && exit 1 ; }
 
 echo "looking up original copy of ${file}"
@@ -14,18 +24,41 @@ echo "looking up original copy of ${file}"
 #echo "/usr/portage/x11-base/xorg-server/xorg-server-1.16.4.ebuild"
 
 package=`equery -q b "${file}"`
+echo "package: ${package}"
 test -z "${package}" && { echo "equery -q b ${file} failed to return a package, might not be a portage installed file, exiting" ; exit 1 ; }
+
+package_category=`echo "${package}" | cut -d '/' -f 1`
+echo "package_category: ${package_category}"
+
+package_without_version=`equery -q b -n "${file}"`
+echo "package_without_version: ${package_without_version}"
+
 package_name_with_version=`echo "${package}" | cut -d '/' -f 2`
-package_subfolder=`equery -q b -n "${file}"`
-ebuild="/usr/portage/${package_subfolder}/${package_name_with_version}.ebuild"
-echo "${ebuild}"
+echo "package_name_with_version: ${package_name_with_version}"
 
-ebuild "${ebuild}" clean
-echo "running ebuild ${ebuild} unpack"
-work_folder=`ebuild "${ebuild}" unpack | grep "Source unpacked in /var/tmp/portage/" | cut -d ' ' -f 5-`
-#echo "${work_folder}"
-echo "compiling to make sure the file exists, todo: att find to check for possible results in ${work_folder}"
-ebuild "${ebuild}" compile
+work_folder="/var/tmp/portage/${package_category}/${package_name_with_version}/work"
+echo "work_folder: ${work_folder}"
+image_folder="/var/tmp/portage/${package_category}/${package_name_with_version}/image"
+echo "image_folder: ${image_folder}"
 
-target_file="${work_folder}/${package_name_with_version}/${file}"
-echo "${target_file}"
+target_file="${image_folder}/${file}"
+#echo "${target_file}"
+
+if [ -e "${target_file}" ];
+then
+    echo "${target_file}"
+else
+    ebuild="/usr/portage/${package_without_version}/${package_name_with_version}.ebuild"
+    echo "${ebuild}"
+
+    ebuild "${ebuild}" clean
+    echo "running ebuild ${ebuild} unpack"
+    ebuild "${ebuild}" unpack
+
+    echo "compiling to make sure the file exists, todo: att find to check for possible results in ${work_folder}"
+    ebuild "${ebuild}" compile
+    echo "running ebuild ${ebuild} install"
+    ebuild "${ebuild}" install
+    echo "${target_file}"
+fi
+
